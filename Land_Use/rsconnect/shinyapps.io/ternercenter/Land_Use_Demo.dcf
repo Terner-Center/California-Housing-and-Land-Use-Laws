@@ -1,0 +1,13 @@
+name: Land_Use_Demo
+title: Land_Use_Demo
+username:
+account: ternercenter
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7755518
+bundleId: 6570536
+url: https://ternercenter.shinyapps.io/Land_Use_Demo/
+when: 1669779269.35722
+lastSyncTime: 1669779269.35724
+asMultiple: FALSE
+asStatic: FALSE
