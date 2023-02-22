@@ -15,17 +15,17 @@ library(rsconnect)
 library(tidyr)
 
 df <- read.csv(file = "https://raw.githubusercontent.com/Terner-Center/California-Housing-and-Land-Use-Laws/main/Latest_land_use_data.csv",check.names=FALSE)
-df <- df[c("Bill No.","Session","Bill Section",'Tags (No Code Ranges)',"Function","URL to Bill Text")]
+df <- df[c("Bill Number","Session","Bill Section",'Tags (No Code Ranges)',"Function","URL to Bill Text")]
 
 #df$Section <- gsub('§ ', ' ', df$Section)
   
 names(df)[names(df) == 'Function'] <- 'Bill Focus'
 names(df)[names(df) == 'Tags (No Code Ranges)'] <- 'Topics'
 names(df)[names(df) == 'Link to Bill Text'] <- 'URL to Bill Text'
-dataframe <- df[c("Bill No.","Session","Bill Section",'Topics',"Bill Focus","URL to Bill Text")]
+dataframe <- df[c("Bill Number","Session","Bill Section",'Topics',"Bill Focus","URL to Bill Text")]
 
 dataframe$Session <- factor(dataframe$Session)
-dataframe$`Bill No.` <- factor(dataframe$`Bill No.`)
+dataframe$`Bill Number` <- factor(dataframe$`Bill Number`)
 dataframe$`Bill Section` <- factor(dataframe$`Bill Section`)
 dataframe$Topics <- factor(dataframe$Topics)
 
@@ -58,13 +58,12 @@ server <- function(input, output) {
   })
 
 
-  
   # Render dataframe in DT
   output$data <- DT::renderDataTable({
     DT::datatable(filtered_data(), filter = "top", escape = FALSE, rownames = FALSE)
   })
+  
 
-    
   # Write filtered data to CSV file when download button is clicked
   output$download_data <- downloadHandler(
     filename = paste("Land_Use_Data_",toString(Sys.Date()), ".csv", sep = ""),
