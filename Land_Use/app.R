@@ -7,97 +7,77 @@
 #    http://shiny.rstudio.com/
 #
 
-#base code here taken from https://www.davidsolito.com/post/conditional-drop-down-in-shiny/ 
-#look at carolinas email for type sof categories they thinking, assing arbitrariliy, and make a mock version they can see 
+#this is the latest and correct version 
 
-
-#seems like you can just embed R shiny stuff within HTML if you publish it first on the R shiny site 
-#https://datasciencegenie.com/how-to-embed-a-shiny-app-on-website/
-#sign up for an account, try this, and then tell cora how easy 
-library(DT)
 library(shiny)
-library(shinyWidgets)
-#library(googlesheets4)
 library(dplyr)
 library(rsconnect)
-#install.packages('rsconnect')
-#install.packages("googlesheets4")
-#install.packages("shinyWidgets")
-#gs4_deauth()
+library(tidyr)
 
-#setwd("/Users/underriner/Desktop/work/land_use_dashboard/Shiny_app")
+df <- read.csv(file = "https://raw.githubusercontent.com/Terner-Center/California-Housing-and-Land-Use-Laws/main/Latest_land_use_data.csv",check.names=FALSE)
+df <- df[c("Bill No.","Session","Bill Section",'Tags (No Code Ranges)',"Function","URL to Bill Text")]
 
-#if i put on github, need to mask token codes 
-#rsconnect::setAccountInfo(name='ternercenter', 
-#  token='F7E0AD0553E675AC3A1294CC15A049FA', secret='o5lzKVaFl10nGpEkSDsQK68Mo6GNtLaXyTWREkKR')
-
-
-#ideally this will be read in from 
-#df <- read.csv(file = 'land_use_data_11_23_22.csv')
-#the origional file was an uploaded excel - needed to make my own copy that was native to Google sheets 
-#df <- read_sheet("https://docs.google.com/spreadsheets/d/1aR21v_mYrVh0dCaU6fcQD6pdMtfoTHIkqH6UHpBUNUQ/edit#gid=0")
-
-df <-read.csv(file = "https://raw.githubusercontent.com/Terner-Center/California-Housing-and-Land-Use-Laws/main/California%20Housing%20and%20Land%20Use%20Laws%20-%20Updates%20Since%202017_last_updated_11_28_22.csv")
-
-df_sub <- df[c("Bill.No.","Session","Topic","Function")]
-
-
-shinyApp(
-  ui = pageWithSidebar(
-    headerPanel("Land Use Dashboard Test"),
-    
-#    sidebarSearchForm(textId = "searchText", buttonId = "searchButton", 
-#                      label = "Search dataset", icon = shiny::icon("search"))
-#  ),
-    
-    sidebarPanel(
-      #style = "position:fixed;width:220px;",
-      selectizeGroupUI(
-        id = "my-filters",
-        inline = FALSE,
-        params = list(
-          var_one = list(inputId = "Session", title = "Select Year", placeholder = 'select'),
-          var_two = list(inputId = "Bill.No.", title = "Select Bill Number",placeholder ='select')
-          #var_three = list(inputId = "var_three", title = "Select variable 3", placeholder = 'select'),
-          #var_four = list(inputId = "var_four", title = "Select variable 4", placeholder = 'select'),
-          #var_five = list(inputId = "var_five", title = "Select variable 5", placeholder = 'select')
-        )
-      
-        ),
-    downloadButton("downloadData", "Download Current Data"),
-    ),
-    
-    
-    mainPanel(
-      tableOutput("table")
-    )
-  ),
+#df$Section <- gsub('§ ', ' ', df$Section)
   
-  server = function(input, output, session) {
-    
-    res_mod <- callModule(
-      module = selectizeGroupServer,
-      id = "my-filters",
-      data = df_sub,
-      vars = c("Session", "Bill.No.")
-    )
-    
-    output$table <- renderTable({
-      res_mod()
-    })
-    output$downloadData <- downloadHandler(
-      filename = function() {
-        paste("Land_Use_Data_",toString(Sys.Date()), ".csv", sep = "") #Sys.Date() #Add date 
-      },
-      content = function(file) {
-        write.csv(res_mod(), file, row.names = FALSE)
-      }
-    )
-    
-    
-  },
-  
-  options = list(height = 500)
+names(df)[names(df) == 'Function'] <- 'Bill Focus'
+names(df)[names(df) == 'Tags (No Code Ranges)'] <- 'Topics'
+names(df)[names(df) == 'Link to Bill Text'] <- 'URL to Bill Text'
+dataframe <- df[c("Bill No.","Session","Bill Section",'Topics',"Bill Focus","URL to Bill Text")]
+
+dataframe$Session <- factor(dataframe$Session)
+dataframe$`Bill No.` <- factor(dataframe$`Bill No.`)
+dataframe$`Bill Section` <- factor(dataframe$`Bill Section`)
+dataframe$Topics <- factor(dataframe$Topics)
+
+#dataframe <- dataframe %>% mutate(clickme = '<a href="#" 
+#                    onmousedown="event.preventDefault(); event.stopPropagation(); alert(event); return false;";
+#                    >CLICKME</a>')
+
+
+dataframe$`URL to Bill Text` <- paste0("<a href='",dataframe$`URL to Bill Text`,"' target='_blank'>","Bill Text","</a>")
+
+
+# Define UI
+ui <- fluidPage(
+  downloadButton("download_data", "Download full dataset as CSV"),
+ DT::dataTableOutput("data"),
 )
 
-#deployApp()
+# Define server logic
+server <- function(input, output) {
+  # Filter dataframe based on search input and selected columns
+  filtered_data <- reactive({
+    if (length(input$columns) == 0) {
+      # If no columns are selected, return the full dataframe
+      return(dataframe)
+    } else {
+      # If columns are selected, filter the dataframe
+      dataframe %>%
+        filter_at(vars(input$columns), any_vars(grepl(input$search, ., ignore.case = TRUE)))
+    }
+  })
+
+
+  
+  # Render dataframe in DT
+  output$data <- DT::renderDataTable({
+    DT::datatable(filtered_data(), filter = "top", escape = FALSE, rownames = FALSE)
+  })
+
+    
+  # Write filtered data to CSV file when download button is clicked
+  output$download_data <- downloadHandler(
+    filename = paste("Land_Use_Data_",toString(Sys.Date()), ".csv", sep = ""),
+    content = function(file) {
+      write.csv(filtered_data(), file, row.names = FALSE)
+    }
+  )
+}
+
+# Initialize reactive values
+shinyServer(function(input, output, session) {
+  reactiveValuesToList(session)$search <- ""
+})
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
